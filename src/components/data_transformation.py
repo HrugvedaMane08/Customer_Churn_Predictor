@@ -27,7 +27,7 @@ class DataTransformation:
         try:
             # Numerical and Categorical feature lists for churn prediction
             numerical_columns = ["tenure", "MonthlyCharges", "TotalCharges"]
-            categorical_columns = ["Gender", "Contract"]
+            categorical_columns = ["gender", "Contract"]
 
             num_pipeline = Pipeline(
                 steps=[
@@ -67,6 +67,14 @@ class DataTransformation:
             test_df = pd.read_csv(test_path)
 
             logging.info("Successfully read train and test data files")
+            
+            # Preprocess TotalCharges and target column Churn to handle real-world dataset formatting
+            logging.info("Cleaning TotalCharges and mapping target Churn column to binary integers")
+            for df in [train_df, test_df]:
+                df['TotalCharges'] = pd.to_numeric(df['TotalCharges'].astype(str).str.strip(), errors='coerce')
+                df['TotalCharges'] = df['TotalCharges'].fillna(0.0)
+                df['Churn'] = df['Churn'].map({'Yes': 1, 'No': 0})
+
             logging.info("Obtaining preprocessing object")
 
             preprocessing_obj = self.get_data_transformer_object()

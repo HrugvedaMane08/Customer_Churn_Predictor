@@ -54,7 +54,7 @@ class CustomData:
                 "tenure": [self.tenure],
                 "MonthlyCharges": [self.MonthlyCharges],
                 "TotalCharges": [self.TotalCharges],
-                "Gender": [self.Gender],
+                "gender": [self.Gender],
                 "Contract": [self.Contract]
             }
             return pd.DataFrame(custom_data_input_dict)
