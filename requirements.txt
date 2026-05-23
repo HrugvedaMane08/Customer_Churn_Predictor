@@ -1,0 +1,12 @@
+pandas
+numpy
+scikit-learn
+xgboost
+dill
+fastapi
+uvicorn
+ipykernel
+matplotlib
+seaborn
+pytest
+-e .
