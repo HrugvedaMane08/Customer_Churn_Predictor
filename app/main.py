@@ -1,14 +1,10 @@
 import os
 import sys
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
-from pydantic import BaseModel
-import uvicorn
 
-from src.pipeline.predict_pipeline import PredictPipeline, CustomData
-from src.pipeline.train_pipeline import TrainPipeline
+from app.api.router import api_router
 from src.logger import logging
-from src.exception import CustomException
 
 app = FastAPI(
     title="Customer Churn Prediction Service",
@@ -16,25 +12,8 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# Pydantic schema for prediction requests
-class PredictionRequest(BaseModel):
-    tenure: int
-    MonthlyCharges: float
-    TotalCharges: float
-    Gender: str
-    Contract: str
-
-    model_config = {
-        "json_schema_extra": {
-            "example": {
-                "tenure": 12,
-                "MonthlyCharges": 70.5,
-                "TotalCharges": 846.0,
-                "Gender": "Male",
-                "Contract": "Month-to-month"
-            }
-        }
-    }
+# Register versioned API router
+app.include_router(api_router, prefix="/api/v1")
 
 @app.get("/", response_class=HTMLResponse)
 async def read_root():
@@ -327,7 +306,7 @@ async def read_root():
                 };
 
                 try {
-                    const response = await fetch("/predict", {
+                    const response = await fetch("/api/v1/predict/", {
                         method: "POST",
                         headers: {
                             "Content-Type": "application/json"
@@ -362,7 +341,7 @@ async def read_root():
                 trainBtn.innerText = "Training...";
 
                 try {
-                    const response = await fetch("/train", {
+                    const response = await fetch("/api/v1/train/", {
                         method: "POST"
                     });
                     const data = await response.json();
@@ -385,53 +364,6 @@ async def read_root():
     """
     return HTMLResponse(content=html_content)
 
-@app.post("/predict")
-def predict(request: PredictionRequest):
-    """
-    Predict churn endpoint. Feeds standard JSON payload to the prediction pipeline.
-    """
-    try:
-        logging.info(f"Received API prediction request: {request}")
-        
-        # Instantiate custom data model helper
-        custom_data = CustomData(
-            tenure=request.tenure,
-            MonthlyCharges=request.MonthlyCharges,
-            TotalCharges=request.TotalCharges,
-            Gender=request.Gender,
-            Contract=request.Contract
-        )
-
-        df = custom_data.get_data_as_data_frame()
-        pipeline = PredictPipeline()
-        predictions = pipeline.predict(df)
-
-        return {"prediction": predictions}
-    except FileNotFoundError as fnfe:
-        logging.error(f"Prediction failed: {str(fnfe)}")
-        raise HTTPException(status_code=400, detail=str(fnfe))
-    except Exception as e:
-        logging.error(f"Prediction error occurred: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
-
-@app.post("/train")
-def train():
-    """
-    Triggers model training. Re-fits preprocessors and classification models.
-    """
-    try:
-        logging.info("API request triggered to run the training pipeline")
-        pipeline = TrainPipeline()
-        metrics = pipeline.run_pipeline()
-        return {
-            "status": "Success",
-            "message": "Model training completed successfully.",
-            "best_model_accuracy": metrics["accuracy"],
-            "metrics": metrics
-        }
-    except Exception as e:
-        logging.error(f"Training pipeline error occurred: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
-
 if __name__ == "__main__":
+    import uvicorn
     uvicorn.run("app.main:app", host="127.0.0.1", port=8000, reload=True)
