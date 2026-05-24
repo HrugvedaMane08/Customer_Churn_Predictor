@@ -1,7 +1,9 @@
 import axios from 'axios';
 
-// Get base API URL from environment variables
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api/v1';
+// Use relative path in browser for proxy rewrites, full URL on server side
+const API_URL = typeof window !== 'undefined'
+  ? '/api/v1'
+  : (process.env.BACKEND_API_URL || 'http://127.0.0.1:8000') + '/api/v1';
 
 // Create a configured Axios instance
 export const api = axios.create({
