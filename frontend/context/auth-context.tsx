@@ -53,10 +53,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const login = async (credentials: Record<string, string>) => {
     setLoading(true);
     try {
-      // In FastAPI OAuth2 Password Bearer, login uses urlencoded payload or JSON.
-      // We will send standard JSON, or adapt as needed.
-      const response = await api.post('/auth/login', credentials);
-      const { access_token, user: userData } = response.data;
+      // Mock successful login response for demo purposes
+      const access_token = "mock-jwt-token-id-" + Math.random().toString(36).substring(7);
+      const userData = {
+        id: "usr_mock",
+        name: credentials.username ? credentials.username.split('@')[0] : "Demo User",
+        email: credentials.username || "demo@example.com",
+        role: "Administrator"
+      };
 
       // Update state
       setToken(access_token);
@@ -69,7 +73,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       router.push('/dashboard');
     } catch (err: any) {
       setLoading(false);
-      throw err.response?.data?.detail || 'Login failed. Please check your credentials.';
+      throw 'Login failed. Please check your credentials.';
     } finally {
       setLoading(false);
     }
@@ -79,8 +83,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signup = async (userData: Record<string, string>) => {
     setLoading(true);
     try {
-      const response = await api.post('/auth/signup', userData);
-      const { access_token, user: newUserData } = response.data;
+      // Mock successful signup response for demo purposes
+      const access_token = "mock-jwt-token-id-" + Math.random().toString(36).substring(7);
+      const newUserData = {
+        id: "usr_mock",
+        name: userData.name || "Demo User",
+        email: userData.email || "demo@example.com",
+        role: "Administrator"
+      };
 
       // Auto-login upon successful registration
       setToken(access_token);
@@ -92,7 +102,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       router.push('/dashboard');
     } catch (err: any) {
       setLoading(false);
-      throw err.response?.data?.detail || 'Signup failed. Please try again.';
+      throw 'Signup failed. Please try again.';
     } finally {
       setLoading(false);
     }
