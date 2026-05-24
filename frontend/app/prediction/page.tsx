@@ -22,15 +22,15 @@ import {
 
 // Churn input validation schema matching backend inputs
 const predictionSchema = z.object({
-  tenure: z.number({ invalid_type_error: 'Tenure must be a number' })
+  tenure: z.number({ message: 'Tenure must be a number' })
     .int('Tenure must be a whole number')
     .min(0, 'Tenure cannot be negative'),
-  MonthlyCharges: z.number({ invalid_type_error: 'Monthly charge must be a number' })
+  MonthlyCharges: z.number({ message: 'Monthly charge must be a number' })
     .min(0, 'Monthly charge cannot be negative'),
-  TotalCharges: z.number({ invalid_type_error: 'Total charge must be a number' })
+  TotalCharges: z.number({ message: 'Total charge must be a number' })
     .min(0, 'Total charge cannot be negative'),
-  Gender: z.enum(['Male', 'Female'], { required_error: 'Please select a gender' }),
-  Contract: z.enum(['Month-to-month', 'One year', 'Two year'], { required_error: 'Please select a contract type' }),
+  Gender: z.enum(['Male', 'Female'], { message: 'Please select a gender' }),
+  Contract: z.enum(['Month-to-month', 'One year', 'Two year'], { message: 'Please select a contract type' }),
 });
 
 type PredictionFormValues = z.infer<typeof predictionSchema>;
