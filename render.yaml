@@ -1,0 +1,42 @@
+# Render Blueprint Specification (render.yaml)
+#
+# This file allows you to deploy the entire application as a single unified Web Service
+# on Render using Infrastructure-as-Code.
+#
+# How to use:
+# 1. Push this file to GitHub.
+# 2. Go to the Render Dashboard (https://dashboard.render.com/).
+# 3. Click "New" and select "Blueprint".
+# 4. Connect your GitHub repository.
+# 5. Render will read this file and set up the Web Service automatically.
+
+services:
+  - type: web
+    name: customer-churn-predictor
+    env: docker
+    dockerfilePath: Dockerfile
+    
+    # Render routes internet traffic to this service
+    public: true
+    
+    # Environment variables
+    envVars:
+      - key: PORT
+        value: 8000
+
+    # SQLite Database Persistence:
+    # ----------------------------------------------------
+    # NOTE: Render's Free tier does not support persistent disks.
+    #
+    # - If you are deploying on Render's Free Tier:
+    #   Keep the 'disk' section commented out below. Your database will be created in the 
+    #   ephemeral storage. It will function, but prediction history will reset when the service restarts.
+    #
+    # - If you are deploying on a Paid Tier (Individual/Starter):
+    #   Uncomment the 'disk' section below. Render will mount a persistent solid-state disk
+    #   at `/app/artifacts` which keeps your SQLite database safe across restarts and redeploys.
+    # ----------------------------------------------------
+    # disk:
+    #   name: churn-db-volume
+    #   mountPath: /app/artifacts
+    #   sizeGB: 1
