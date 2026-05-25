@@ -32,6 +32,33 @@ class PredictPipeline:
         except Exception as e:
             raise CustomException(e, sys)
 
+    def predict_with_proba(self, features: pd.DataFrame) -> tuple:
+        """
+        Loads the preprocessor and model, preprocesses the input features,
+        and returns prediction outputs and their probabilities (confidence scores).
+        """
+        try:
+            logging.info("Starting prediction pipeline with probabilities")
+            if not os.path.exists(self.model_path) or not os.path.exists(self.preprocessor_path):
+                raise FileNotFoundError("Model or preprocessor artifacts not found. Please run the training pipeline first.")
+
+            model = load_object(self.model_path)
+            preprocessor = load_object(self.preprocessor_path)
+
+            logging.info("Preprocessing features for inference")
+            scaled_data = preprocessor.transform(features)
+            
+            logging.info("Generating predictions and probabilities")
+            predictions = model.predict(scaled_data)
+            
+            probabilities = None
+            if hasattr(model, "predict_proba"):
+                probabilities = model.predict_proba(scaled_data)
+                
+            return predictions.tolist(), probabilities.tolist() if probabilities is not None else None
+        except Exception as e:
+            raise CustomException(e, sys)
+
 class CustomData:
     """
     Helper class to format user input dictionary into a Pandas DataFrame.

@@ -4,7 +4,7 @@ import axios from 'axios';
 const isDev = process.env.NODE_ENV === 'development';
 const defaultBackend = isDev ? 'http://127.0.0.1:8000' : 'https://customer-churn-predictor-3p9a.onrender.com';
 const API_URL = typeof window !== 'undefined'
-  ? '/api/v1'
+  ? (isDev ? 'http://127.0.0.1:8000/api/v1' : '/api/v1')
   : (process.env.BACKEND_API_URL || defaultBackend) + '/api/v1';
 
 // Create a configured Axios instance

@@ -1,10 +1,12 @@
 import os
 import sys
 from fastapi import FastAPI
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, FileResponse
 
 from app.api.router import api_router
 from src.logger import logging
+
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(
     title="Customer Churn Prediction Service",
@@ -12,14 +14,47 @@ app = FastAPI(
     version="1.0.0"
 )
 
+# Enable CORS for frontend requests
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 # Register versioned API router
 app.include_router(api_router, prefix="/api/v1")
+
+# Determine paths for frontend build
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+frontend_path = os.path.join(BASE_DIR, "frontend", "out")
+has_frontend = os.path.exists(frontend_path)
+
+if has_frontend:
+    logging.info(f"Frontend static build found at {frontend_path}. Mounting at root.")
+    from starlette.exceptions import HTTPException as StarletteHTTPException
+    from fastapi.staticfiles import StaticFiles
+    
+    # Custom 404 handler to fallback to Next.js 404 page
+    @app.exception_handler(StarletteHTTPException)
+    async def custom_http_exception_handler(request, exc):
+        if exc.status_code == 404:
+            static_404 = os.path.join(frontend_path, "404.html")
+            if os.path.exists(static_404):
+                return FileResponse(static_404, status_code=404)
+        return HTMLResponse(content=f"Error {exc.status_code}", status_code=exc.status_code)
+    
+    app.mount("/", StaticFiles(directory=frontend_path, html=True), name="frontend")
 
 @app.get("/", response_class=HTMLResponse)
 async def read_root():
     """
-    Renders a stunning, premium glassmorphism prediction dashboard.
+    Renders either the static frontend index or the fallback landing page.
     """
+    if has_frontend:
+        return FileResponse(os.path.join(frontend_path, "index.html"))
+
     html_content = """
     <!DOCTYPE html>
     <html lang="en">
