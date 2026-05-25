@@ -13,11 +13,8 @@
 services:
   - type: web
     name: customer-churn-predictor
-    env: docker
+    runtime: docker
     dockerfilePath: Dockerfile
-    
-    # Render routes internet traffic to this service
-    public: true
     
     # Environment variables
     envVars:
