@@ -20,7 +20,7 @@ type ForgotPasswordFormValues = z.infer<typeof forgotPasswordSchema>;
 export default function ForgotPasswordPage() {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [successData, setSuccessData] = useState<{ message: string; temporary_password?: string } | null>(null);
+  const [successData, setSuccessData] = useState<{ message: string; email_sent?: boolean; reset_link?: string } | null>(null);
   const [copied, setCopied] = useState(false);
 
   const {
@@ -52,8 +52,8 @@ export default function ForgotPasswordPage() {
   };
 
   const copyToClipboard = () => {
-    if (successData?.temporary_password) {
-      navigator.clipboard.writeText(successData.temporary_password);
+    if (successData?.reset_link) {
+      navigator.clipboard.writeText(successData.reset_link);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     }
@@ -67,17 +67,20 @@ export default function ForgotPasswordPage() {
         </div>
         
         <div className="flex flex-col space-y-1.5">
-          <h3 className="text-xl font-bold text-slate-100">Password Reset Successful</h3>
+          <h3 className="text-xl font-bold text-slate-100">Password Reset Request</h3>
           <p className="text-sm text-slate-400">
-            A temporary password has been successfully generated for your account.
+            {successData.email_sent 
+              ? "We've sent a password reset link to your email address. Please follow the instructions to set your new password."
+              : "A password reset link has been successfully generated."}
           </p>
         </div>
 
-        {successData.temporary_password && (
+        {/* Show reset link in sandbox mode (when email_sent is false) */}
+        {!successData.email_sent && successData.reset_link && (
           <div className="space-y-3">
-            <Label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Temporary Password</Label>
-            <div className="flex items-center justify-between gap-3 bg-slate-950 border border-slate-800 rounded-xl p-3.5 pl-4 text-white font-mono text-sm shadow-inner group">
-              <span className="select-all tracking-wide">{successData.temporary_password}</span>
+            <Label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Reset Link (Sandbox Mode)</Label>
+            <div className="flex items-center justify-between gap-3 bg-slate-950 border border-slate-800 rounded-xl p-3.5 pl-4 text-white font-mono text-xs shadow-inner group">
+              <span className="select-all tracking-wide truncate max-w-[280px]">{successData.reset_link}</span>
               <button
                 type="button"
                 onClick={copyToClipboard}
@@ -87,12 +90,18 @@ export default function ForgotPasswordPage() {
                 {copied ? <Check className="h-4 w-4 text-emerald-400" /> : <Copy className="h-4 w-4" />}
               </button>
             </div>
+            
+            <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-4 text-xs text-amber-300/80 leading-relaxed">
+              <strong>Sandbox Notice:</strong> SMTP email servers are not fully configured. Copy the reset link above and open it in a new tab to change your password directly.
+            </div>
           </div>
         )}
 
-        <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-4 text-xs text-amber-300/80 leading-relaxed">
-          <strong>Sandbox Notice:</strong> Since SMTP email servers are not configured in this local environment, we have reset the password directly in the database. Copy the temporary password above and sign in.
-        </div>
+        {successData.email_sent && (
+          <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4 text-xs text-emerald-400 leading-relaxed">
+            <strong>Check your inbox:</strong> The reset link was sent to your email. Click it to set your new password. Please check your spam folder if it doesn't arrive within 2 minutes.
+          </div>
+        )}
 
         <Link href="/login" className="block pt-2">
           <Button className="w-full bg-slate-800 hover:bg-slate-700 text-white font-semibold flex items-center justify-center gap-2 rounded-xl transition-all">

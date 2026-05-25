@@ -23,12 +23,12 @@ router = APIRouter()
 # Share the same SQLite database in the artifacts directory
 DB_PATH = os.path.join("artifacts", "predictions.db")
 
-# SMTP Server Configurations
-SMTP_HOST = os.getenv("SMTP_HOST")
-SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
-SMTP_USERNAME = os.getenv("SMTP_USERNAME")
-SMTP_PASSWORD = os.getenv("SMTP_PASSWORD")
-SMTP_SENDER = os.getenv("SMTP_SENDER", SMTP_USERNAME)
+# SMTP Server Configurations (checks both uppercase and lowercase to prevent config issues)
+SMTP_HOST = os.getenv("SMTP_HOST") or os.getenv("smtp_host")
+SMTP_PORT = int(os.getenv("SMTP_PORT") or os.getenv("smtp_port") or "587")
+SMTP_USERNAME = os.getenv("SMTP_USERNAME") or os.getenv("smtp_username")
+SMTP_PASSWORD = os.getenv("SMTP_PASSWORD") or os.getenv("smtp_password")
+SMTP_SENDER = os.getenv("SMTP_SENDER") or os.getenv("smtp_sender") or SMTP_USERNAME
 
 def init_auth_db():
     """
