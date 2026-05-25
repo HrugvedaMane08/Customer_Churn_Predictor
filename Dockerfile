@@ -69,6 +69,7 @@ COPY --from=backend-builder /opt/venv /opt/venv
 # Copy backend source code and FastAPI app
 COPY app/ /app/app/
 COPY src/ /app/src/
+COPY artifacts/ /app/artifacts/
 
 # Copy statically compiled frontend from Stage 1 into the static root path
 COPY --from=frontend-builder /frontend/out/ /app/frontend/out/
