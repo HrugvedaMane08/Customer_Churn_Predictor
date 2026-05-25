@@ -40,3 +40,10 @@ class AuthResponseSchema(BaseModel):
     access_token: str
     token_type: str = "bearer"
     user: UserResponseSchema
+
+class ResetPasswordSchema(BaseModel):
+    """
+    Schema for password reset requests containing the token and new password.
+    """
+    token: str = Field(..., example="secure-reset-token-hex")
+    password: str = Field(..., min_length=6, example="newsecurepassword123")
