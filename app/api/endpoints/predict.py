@@ -2,10 +2,11 @@ import sys
 import os
 import sqlite3
 from datetime import datetime
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from app.schemas.churn_schema import ChurnInputSchema
 from src.pipeline.predict_pipeline import PredictPipeline, CustomData
 from src.logger import logging
+from app.api.endpoints.auth import get_current_user
 
 router = APIRouter()
 
@@ -14,13 +15,15 @@ DB_PATH = os.path.join("artifacts", "predictions.db")
 
 def init_db():
     """
-    Initializes the local SQLite database and creates the prediction history table
-    if it doesn't already exist.
+    Initializes the local SQLite database, creates the prediction history table
+    if it doesn't exist, and performs migrations to add columns if necessary.
     """
     try:
         os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
+        
+        # 1. Create base table if not exists
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS prediction_history (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -34,6 +37,14 @@ def init_db():
                 confidence_score REAL
             )
         """)
+        
+        # 2. Schema check & migration: add user_id column if not exists
+        cursor.execute("PRAGMA table_info(prediction_history)")
+        columns = [row[1] for row in cursor.fetchall()]
+        if "user_id" not in columns:
+            cursor.execute("ALTER TABLE prediction_history ADD COLUMN user_id INTEGER")
+            logging.info("SQLite database prediction_history table migrated: added user_id column.")
+            
         conn.commit()
         conn.close()
         logging.info("SQLite database prediction_history table initialized successfully.")
@@ -44,13 +55,13 @@ def init_db():
 init_db()
 
 @router.post("/", summary="Submit customer details to get a churn prediction")
-def predict_churn(payload: ChurnInputSchema):
+def predict_churn(payload: ChurnInputSchema, current_user: dict = Depends(get_current_user)):
     """
     Validates input features using Pydantic, applies the preprocessing pipeline,
     runs inference on the trained classification model, and persists the record.
     """
     try:
-        logging.info(f"Received API request for customer churn prediction: {payload}")
+        logging.info(f"Received API request for customer churn prediction from user {current_user['email']}: {payload}")
         
         # Instantiate CustomData mapper
         custom_data = CustomData(
@@ -74,18 +85,18 @@ def predict_churn(payload: ChurnInputSchema):
         if probabilities is not None and len(probabilities) > 0:
             confidence_score = float(probabilities[0][churn_prediction])
         
-        # Persist prediction in the SQLite database
+        # Persist prediction in the SQLite database associated with the logged in user
         try:
             conn = sqlite3.connect(DB_PATH)
             cursor = conn.cursor()
             timestamp = datetime.utcnow().isoformat() + "Z"
             cursor.execute("""
-                INSERT INTO prediction_history (timestamp, tenure, monthly_charges, total_charges, gender, contract, churn_prediction, confidence_score)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """, (timestamp, payload.tenure, payload.MonthlyCharges, payload.TotalCharges, payload.Gender, payload.Contract, churn_prediction, confidence_score))
+                INSERT INTO prediction_history (timestamp, tenure, monthly_charges, total_charges, gender, contract, churn_prediction, confidence_score, user_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (timestamp, payload.tenure, payload.MonthlyCharges, payload.TotalCharges, payload.Gender, payload.Contract, churn_prediction, confidence_score, int(current_user["id"])))
             conn.commit()
             conn.close()
-            logging.info("Prediction successfully logged to SQLite database.")
+            logging.info(f"Prediction successfully logged for user ID: {current_user['id']}")
         except Exception as db_err:
             logging.error(f"Failed to persist prediction in SQLite database: {str(db_err)}")
         
@@ -107,18 +118,22 @@ def predict_churn(payload: ChurnInputSchema):
         raise HTTPException(status_code=500, detail=f"Internal Server Error occurred during prediction: {str(e)}")
 
 @router.get("/history", summary="Get all churn prediction history")
-def get_prediction_history():
+def get_prediction_history(current_user: dict = Depends(get_current_user)):
     """
-    Retrieves all previously logged churn prediction records from the database.
+    Retrieves all previously logged churn prediction records from the database for the active user.
     """
     try:
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
+        
+        # Filter by active user_id (or include null for general system legacy records)
         cursor.execute("""
             SELECT id, timestamp, tenure, monthly_charges, total_charges, gender, contract, churn_prediction, confidence_score
             FROM prediction_history
+            WHERE user_id = ? OR user_id IS NULL
             ORDER BY timestamp DESC
-        """)
+        """, (int(current_user["id"]),))
+        
         rows = cursor.fetchall()
         conn.close()
         
@@ -141,17 +156,18 @@ def get_prediction_history():
         raise HTTPException(status_code=500, detail=f"Database query failed: {str(e)}")
 
 @router.get("/stats", summary="Get aggregate analytics stats for churn predictions")
-def get_churn_stats():
+def get_churn_stats(current_user: dict = Depends(get_current_user)):
     """
-    Calculates summary metrics across all logged predictions and returns them
-    along with the most recent 10 records.
+    Calculates summary metrics across logged predictions for the active user.
     """
     try:
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
         
+        user_id_val = int(current_user["id"])
+        
         # 1. Total count
-        cursor.execute("SELECT COUNT(*) FROM prediction_history")
+        cursor.execute("SELECT COUNT(*) FROM prediction_history WHERE user_id = ? OR user_id IS NULL", (user_id_val,))
         total_predictions = cursor.fetchone()[0]
         
         if total_predictions == 0:
@@ -165,11 +181,11 @@ def get_churn_stats():
             }
             
         # 2. High risk count
-        cursor.execute("SELECT COUNT(*) FROM prediction_history WHERE churn_prediction = 1")
+        cursor.execute("SELECT COUNT(*) FROM prediction_history WHERE (user_id = ? OR user_id IS NULL) AND churn_prediction = 1", (user_id_val,))
         high_risk_count = cursor.fetchone()[0]
         
         # 3. Average monthly charges
-        cursor.execute("SELECT AVG(monthly_charges) FROM prediction_history")
+        cursor.execute("SELECT AVG(monthly_charges) FROM prediction_history WHERE user_id = ? OR user_id IS NULL", (user_id_val,))
         average_monthly_charges = cursor.fetchone()[0] or 0.0
         
         # 4. Churn rate percentage
@@ -179,9 +195,10 @@ def get_churn_stats():
         cursor.execute("""
             SELECT id, timestamp, tenure, monthly_charges, total_charges, gender, contract, churn_prediction, confidence_score
             FROM prediction_history
+            WHERE user_id = ? OR user_id IS NULL
             ORDER BY timestamp DESC
             LIMIT 10
-        """)
+        """, (user_id_val,))
         rows = cursor.fetchall()
         conn.close()
         
